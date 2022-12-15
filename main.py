@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from json import dumps
 from os import getenv, path, walk
 from subprocess import PIPE, STDOUT, Popen
+from typing import Optional
 
 
 class JsonFormatter(logging.Formatter):
@@ -146,7 +147,7 @@ class AWSTerragrunt:
                    stdout=PIPE, stderr=STDOUT) as proc_result:
             proc_result.communicate()
 
-    def __run_proccess(self, cmd: str, diff_path: str, func_uuid: str = None):
+    def __run_proccess(self, cmd: str, diff_path: str, func_uuid: str = None) -> tuple:
         """
         Running and returning output and error of process.
 
@@ -161,7 +162,7 @@ class AWSTerragrunt:
             output, error = proc_result.communicate()
             return output, error, proc_result.returncode
 
-    def __get_lock_id(self, raw_output: str) -> str:
+    def __get_lock_id(self, raw_output: str) -> Optional[str]:
         """
         Finding and returning lock_id from terraform output.
 
