@@ -153,7 +153,7 @@ class AWSTerragrunt:
 
         Keyword arguments:
         cmd         -- running command
-        state_path   -- the root directory for command running
+        state_path  -- the root directory for command running
         func_uuid   -- unique UID for a better debugging process
         """
         logger.debug({"msg": "Running run_proccess function", "uuid": func_uuid})
