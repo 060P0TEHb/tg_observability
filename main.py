@@ -103,7 +103,7 @@ class Diff:
     """
     Class for keeping diffs of terraform states
 
-    diff_path   -- Path to terragrunt files that have changes
+    state_path   -- Path to terragrunt files that have changes
     output      -- The outputs from terragrunt command
     exit_status -- Terragrun process exit status
                     0 - Succeeded, diff is empty (no changes)
@@ -114,7 +114,7 @@ class Diff:
     lock_id     -- The lock id of the terragrunt state,
                     default is None
     """
-    diff_path:      str
+    state_path:      str
     output:         str
     exit_status:    int
     error:          str = None
@@ -147,18 +147,18 @@ class AWSTerragrunt:
                    stdout=PIPE, stderr=STDOUT) as proc_result:
             proc_result.communicate()
 
-    def __run_proccess(self, cmd: str, diff_path: str, func_uuid: str = None) -> tuple:
+    def __run_proccess(self, cmd: str, state_path: str, func_uuid: str = None) -> tuple:
         """
         Running and returning output and error of process.
 
         Keyword arguments:
         cmd         -- running command
-        diff_path   -- the root directory for command running
+        state_path   -- the root directory for command running
         func_uuid   -- unique UID for a better debugging process
         """
         logger.debug({"msg": "Running run_proccess function", "uuid": func_uuid})
         with Popen(cmd, shell=True,  universal_newlines=True,
-                   stdout=PIPE, stderr=STDOUT, cwd=diff_path) as proc_result:
+                   stdout=PIPE, stderr=STDOUT, cwd=state_path) as proc_result:
             output, error = proc_result.communicate()
             return output, error, proc_result.returncode
 
@@ -174,42 +174,42 @@ class AWSTerragrunt:
                 return line[line.rfind(' ')+1:]
         return None
 
-    def get_plan(self, diff_path: str) -> Diff:
+    def get_plan(self, state_path: str) -> Diff:
         """
         Running terragrunt plan and returning Diff object instance.
 
         Keyword arguments:
-        diff_path   -- the root directory for command running
+        state_path   -- the root directory for command running
         """
         func_uuid = str(uuid.uuid4())
         logger.debug({"msg": "Running get_plan function", "uuid": func_uuid})
         cmd = f"{self.__auth_envs} terragrunt plan -no-color -detailed-exitcode"
-        output, error, returncode = self.__run_proccess(cmd, diff_path, func_uuid)
+        output, error, returncode = self.__run_proccess(cmd, state_path, func_uuid)
         if returncode == 1:
-            return Diff(diff_path=diff_path,
+            return Diff(state_path=state_path,
                         output=output,
                         exit_status=returncode,
                         error=error,
                         lock_id=self.__get_lock_id(output))
-        return Diff(diff_path=diff_path,
+        return Diff(state_path=state_path,
                     output=output,
                     exit_status=returncode,
                     error=error)
 
-    def force_unlock(self, diff_path: str, lock_id: str) -> Diff:
+    def force_unlock(self, state_path: str, lock_id: str) -> Diff:
         """
         Trying to unlock the terragrunt state, rerunning the terragrunt plan
         command, and returning the Diff object instance.
 
         Keyword arguments:
-        diff_path   -- the root directory for command running
+        state_path   -- the root directory for command running
         lock_id     -- The ID of lock state
         """
         func_uuid = str(uuid.uuid4())
         logger.debug({"msg": "Running force_unlock function", "uuid": func_uuid})
         cmd = f"{self.__auth_envs} terragrunt force-unlock -force {lock_id}"
-        self.__run_proccess(cmd, diff_path, func_uuid)
-        return self.get_plan(diff_path)
+        self.__run_proccess(cmd, state_path, func_uuid)
+        return self.get_plan(state_path)
 
 
 def get_dirs(root_dir: str, exclude_dirs: list = None) -> list:
@@ -305,8 +305,8 @@ def main():
 
     # temporary printing of the result of the tool.
     count = 0
-    for i in sorted(diffs, key=lambda p: p.diff_path, reverse=True):
-        logger.info({"path": i.diff_path, "diff": i.output})
+    for i in sorted(diffs, key=lambda p: p.state_path, reverse=True):
+        logger.info({"path": i.state_path, "diff": i.output})
         count += 1
     logger.info('You need to fix %s states', count)
 
