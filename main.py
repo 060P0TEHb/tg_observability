@@ -38,6 +38,7 @@ class JsonFormatter(logging.Formatter):
         self.fmt_dict = fmt_dict if fmt_dict is not None else {"message": "message"}
         self.default_time_format = time_format
         self.default_msec_format = msec_format
+        logging.Formatter.__init__(self)
 
     def usesTime(self) -> bool:
         """
