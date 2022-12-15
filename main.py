@@ -103,7 +103,7 @@ class Diff:
     """
     Class for keeping diffs of terraform states
 
-    state_path   -- Path to terragrunt files that have changes
+    state_path  -- Path to terragrunt files that have changes
     output      -- The outputs from terragrunt command
     exit_status -- Terragrun process exit status
                     0 - Succeeded, diff is empty (no changes)
@@ -114,7 +114,7 @@ class Diff:
     lock_id     -- The lock id of the terragrunt state,
                     default is None
     """
-    state_path:      str
+    state_path:     str
     output:         str
     exit_status:    int
     error:          str = None
@@ -179,7 +179,7 @@ class AWSTerragrunt:
         Running terragrunt plan and returning Diff object instance.
 
         Keyword arguments:
-        state_path   -- the root directory for command running
+        state_path  -- the root directory for command running
         """
         func_uuid = str(uuid.uuid4())
         logger.debug({"msg": "Running get_plan function", "uuid": func_uuid})
@@ -202,7 +202,7 @@ class AWSTerragrunt:
         command, and returning the Diff object instance.
 
         Keyword arguments:
-        state_path   -- the root directory for command running
+        state_path  -- the root directory for command running
         lock_id     -- The ID of lock state
         """
         func_uuid = str(uuid.uuid4())
