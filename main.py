@@ -86,7 +86,7 @@ class JsonFormatter(logging.Formatter):
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARN)
+logger.setLevel(logging.INFO)
 stream_handler=logging.StreamHandler()
 stream_handler.setFormatter(JsonFormatter({"level": "levelname",
                                            "message": "message",
@@ -282,7 +282,7 @@ def main():
         while threads:
             # Checking the readiness each second
             done, _ = concurrent.futures.wait(
-                threads, timeout=1,return_when=concurrent.futures.FIRST_COMPLETED)
+                threads, timeout=1, return_when=concurrent.futures.FIRST_COMPLETED)
             # Separately checking for each thread
             for thread in done:
                 new_threads = None
