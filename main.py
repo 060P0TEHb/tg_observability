@@ -8,12 +8,12 @@ Input parameters:
 You can override this. For helping type --help
 """
 
+import concurrent.futures
 import logging
 import re
 import uuid
 
 from argparse import ArgumentParser
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from json import dumps
 from os import getenv, path, walk
@@ -86,7 +86,7 @@ class JsonFormatter(logging.Formatter):
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.WARN)
 stream_handler=logging.StreamHandler()
 stream_handler.setFormatter(JsonFormatter({"level": "levelname",
                                            "message": "message",
@@ -174,14 +174,15 @@ class AWSTerragrunt:
                 return line[line.rfind(' ')+1:]
         return None
 
-    def get_plan(self, state_path: str) -> Diff:
+    def get_plan(self, state_path: str, func_uuid: str = None) -> Diff:
         """
         Running terragrunt plan and returning Diff object instance.
 
         Keyword arguments:
         state_path  -- the root directory for command running
+        func_uuid   -- the uuid for debugging purpose
         """
-        func_uuid = str(uuid.uuid4())
+        func_uuid = func_uuid if func_uuid is not None else str(uuid.uuid4())
         logger.debug({"msg": "Running get_plan function", "uuid": func_uuid})
         cmd = f"{self.__auth_envs} terragrunt plan -no-color -detailed-exitcode"
         output, error, returncode = self.__run_proccess(cmd, state_path, func_uuid)
@@ -196,7 +197,7 @@ class AWSTerragrunt:
                     exit_status=returncode,
                     error=error)
 
-    def force_unlock(self, state_path: str, lock_id: str) -> Diff:
+    def force_unlock(self, state_path: str, lock_id: str, func_uuid: str = None) -> Diff:
         """
         Trying to unlock the terragrunt state, rerunning the terragrunt plan
         command, and returning the Diff object instance.
@@ -204,12 +205,13 @@ class AWSTerragrunt:
         Keyword arguments:
         state_path  -- the root directory for command running
         lock_id     -- The ID of lock state
+        func_uuid   -- the uuid for debugging purpose
         """
-        func_uuid = str(uuid.uuid4())
+        func_uuid = func_uuid if func_uuid is not None else str(uuid.uuid4())
         logger.debug({"msg": "Running force_unlock function", "uuid": func_uuid})
         cmd = f"{self.__auth_envs} terragrunt force-unlock -force {lock_id}"
         self.__run_proccess(cmd, state_path, func_uuid)
-        return self.get_plan(state_path)
+        return self.get_plan(state_path, func_uuid)
 
 
 def get_dirs(root_dir: str, exclude_dirs: list = None) -> list:
@@ -274,34 +276,34 @@ def main():
 
     # Initialising of a thread pool
     diffs = []
-    with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        locked_result=[]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
         # Running get_plan method for all found directories
-        plans = [executor.submit(aws_tg.get_plan, path) for path in get_dirs(args.root)]
-        # Parsing the result
-        for plan in as_completed(plans):
-            result = plan.result()
-            # If the Diff object does contain not an empty lock ID field,
-            # remember it for further
-            if result.lock_id is not None:
-                locked_result.append(result)
-                continue
-            # Normalising the get_plan output, if it has errors or diffs
-            if result.exit_status != 0:
-                result.output = format_message(result.output.split('\n'),
-                                               "^$",
-                                               "^You can apply this plan.*$")
-                diffs.append(result)
-        # Running force_unlock method for all states that have the lock ID field
-        plans = [executor.submit(aws_tg.force_unlock, r.path, r.lock_id) for r in locked_result]
-        for plan in as_completed(plans):
-            result = plan.result()
-            # Normalising the get_plan output, if it has errors or diffs
-            if result.exit_status != 0:
-                result.output = format_message(result.output.split('\n'),
-                                               "^$",
-                                               "^You can apply this plan.*$")
-                diffs.append(result)
+        threads = {executor.submit(aws_tg.get_plan, path): "" for path in get_dirs(args.root)}
+        while threads:
+            # Checking the readiness each second
+            done, _ = concurrent.futures.wait(
+                threads, timeout=1,return_when=concurrent.futures.FIRST_COMPLETED)
+            # Separately checking for each thread
+            for thread in done:
+                new_threads = None
+                # If the Diff object does contain not an empty lock ID field,
+                # try to unlock it
+                if thread.result().lock_id is not None:
+                    # Running the new thread
+                    new_threads = executor.submit(aws_tg.force_unlock,
+                                                  thread.result().state_path,
+                                                  thread.result().lock_id)
+                    threads[new_threads] = ""
+
+                # Normalising the Diff.output, if it has errors or diffs
+                # and appending to the result list
+                if thread.result().exit_status != 0 and new_threads is None:
+                    thread.result().output = format_message(thread.result().output.split('\n'),
+                                                            "^$",
+                                                            "^You can apply this plan.*$")
+                    diffs.append(thread.result())
+                # Removing the now-completed thread
+                del threads[thread]
 
     # temporary printing of the result of the tool.
     count = 0
