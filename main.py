@@ -271,14 +271,14 @@ def main():
     AWSTerragrunt.validate_terragrunt()
     # Initialising of AWSTerragrunt class
     aws_tg = AWSTerragrunt(getenv("AWS_ACCESS_KEY_ID"),
-                       getenv("AWS_SECRET_ACCESS_KEY"),
-                       getenv("AWS_SESSION_TOKEN"))
+                           getenv("AWS_SECRET_ACCESS_KEY"),
+                           getenv("AWS_SESSION_TOKEN"))
 
     # Initialising of a thread pool
     diffs = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
         # Running get_plan method for all found directories
-        threads = {executor.submit(aws_tg.get_plan, path): None for path in get_dirs(args.root)}
+        threads = [executor.submit(aws_tg.get_plan, path) for path in get_dirs(args.root)]
         while threads:
             # Checking the readiness each second
             done, _ = concurrent.futures.wait(
@@ -293,7 +293,7 @@ def main():
                     new_threads = executor.submit(aws_tg.force_unlock,
                                                   thread.result().state_path,
                                                   thread.result().lock_id)
-                    threads[new_threads] = None
+                    threads.append(new_threads)
 
                 # Normalising the Diff.output, if it has errors or diffs
                 # and appending to the result list
@@ -303,7 +303,7 @@ def main():
                                                             "^You can apply this plan.*$")
                     diffs.append(thread.result())
                 # Removing the now-completed thread
-                del threads[thread]
+                threads.remove(thread)
 
     # temporary printing of the result of the tool.
     count = 0
