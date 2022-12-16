@@ -278,7 +278,7 @@ def main():
     diffs = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
         # Running get_plan method for all found directories
-        threads = {executor.submit(aws_tg.get_plan, path): "" for path in get_dirs(args.root)}
+        threads = {executor.submit(aws_tg.get_plan, path): None for path in get_dirs(args.root)}
         while threads:
             # Checking the readiness each second
             done, _ = concurrent.futures.wait(
@@ -293,7 +293,7 @@ def main():
                     new_threads = executor.submit(aws_tg.force_unlock,
                                                   thread.result().state_path,
                                                   thread.result().lock_id)
-                    threads[new_threads] = ""
+                    threads[new_threads] = None
 
                 # Normalising the Diff.output, if it has errors or diffs
                 # and appending to the result list
