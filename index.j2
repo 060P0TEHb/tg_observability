@@ -1,0 +1,34 @@
+<DOCTYPE HTML>
+    <html>
+    <head>
+        <meta charset="UTF-8"/>
+        <script type="text/javascript" src="script.js"></script>
+        <link rel="stylesheet" href="styles.css">
+    </head>
+    <body>
+        <span id="main-menu">Expand</span>
+        <h2>Results</h2>
+            <div class="table-wrapper">
+                <table class="result-table">
+                    <tbody>
+                    {%- set ns = namespace(c = 0) %}
+                    {%- for diff in diffs %}
+                    <tr>
+                        <td id="result-table-row-{{ ns.c }}">{{ diff.state_path }}</td>
+                        {%- set ns.c = ns.c + 1 %}
+                    </tr>
+                    <tr>
+                        <td id="result-table-row-{{ ns.c }}" class="row-hide">
+                        {%- set ns.c = ns.c + 1 %}
+    {%- for line in diff.output %}
+    {{ line }}
+    {%- endfor %}
+                        </td>
+                    </tr>
+                    {%- endfor %}
+                    <tbody>
+                </table>
+            </div>
+
+    </body>
+</DOCTYPE>

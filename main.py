@@ -21,6 +21,8 @@ from subprocess import PIPE, STDOUT, Popen
 from typing import Optional
 
 
+from jinja2 import Environment, FileSystemLoader
+
 class JsonFormatter(logging.Formatter):
     """
     Formatter that outputs JSON strings after parsing the LogRecord.
@@ -229,7 +231,7 @@ def get_dirs(root_dir: str, exclude_dirs: list = None) -> list:
     result_list = []
     for root, dirs, files in walk(path.abspath(root_dir)):
         dirs[:] = [d for d in dirs if d not in exclude_dirs]
-        if "terragrunt.hcl" in files:
+        if "terragrunt.hcl" in files and not dirs:
             result_list.append(root)
     return result_list
 
@@ -244,18 +246,20 @@ def format_message(message: list, msg_start: str = None, msg_end: str = None) ->
     """
     first_line_flag = True
     line_number = 0
-    index_start, index_end = 0, len(message)
+    index_start, index_end = 0, len(message)-3
     for line in message:
-        if re.match(msg_start, line) and first_line_flag:
-            index_start = line_number
-            first_line_flag = False
-        # deleting the useless string
+        if msg_start is not None:
+            if re.match(msg_start, line) and first_line_flag:
+                index_start = line_number + 1
+                first_line_flag = False
+        # Truncation of the symbol '─'
         if '\u2500' in line:
-            message[line_number] = ""
-        if re.match(msg_end, line):
-            index_end = line_number
+            message[line_number] = '\u2500'*20
+        if msg_end is not None:
+            if re.match(msg_end, line):
+                index_end = line_number - 1
         line_number+=1
-    return message[index_start+1:index_end-1]
+    return message[index_start:index_end]
 
 def main():
     """ Main function of the tool """
@@ -298,9 +302,7 @@ def main():
                 # Normalising the Diff.output, if it has errors or diffs
                 # and appending to the result list
                 if thread.result().exit_status != 0 and new_threads is None:
-                    thread.result().output = format_message(thread.result().output.split('\n'),
-                                                            "^$",
-                                                            "^You can apply this plan.*$")
+                    thread.result().output = format_message(thread.result().output.split('\n'))
                     diffs.append(thread.result())
                 # Removing the now-completed thread
                 threads.remove(thread)
@@ -312,6 +314,11 @@ def main():
         count += 1
     logger.info('You need to fix %s states', count)
 
+    tool_path=path.realpath(path.dirname(__file__))
+    template = Environment(loader=FileSystemLoader(tool_path)).get_template("index.j2")
+    content = template.render(diffs=diffs)
+    with open(f"{tool_path}/report/index.html", mode="w", encoding="utf-8") as message:
+        message.write(content)
 
 if __name__ == '__main__':
     main()
