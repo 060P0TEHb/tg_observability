@@ -284,11 +284,7 @@ def main():
         # Running get_plan method for all found directories
         threads = [executor.submit(aws_tg.get_plan, path) for path in get_dirs(args.root)]
         while threads:
-            # Checking the readiness each second
-            done, _ = concurrent.futures.wait(
-                threads, timeout=1, return_when=concurrent.futures.FIRST_COMPLETED)
-            # Separately checking for each thread
-            for thread in done:
+            for thread in concurrent.futures.as_completed(threads):
                 new_threads = None
                 # If the Diff object does contain not an empty lock ID field,
                 # try to unlock it
@@ -304,6 +300,7 @@ def main():
                 if thread.result().exit_status != 0 and new_threads is None:
                     thread.result().output = format_message(thread.result().output.split('\n'))
                     diffs.append(thread.result())
+
                 # Removing the now-completed thread
                 threads.remove(thread)
 
